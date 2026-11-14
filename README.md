@@ -63,8 +63,14 @@ and once a day:
 POST /api/v1/cron/maintenance
 ```
 
-Any cron service works (cron-job.org, EasyCron, GitHub Actions, Railway cron,
-Vercel Cron, a shell crontab). Vercel Cron sends GET and supports a Bearer secret.
+Any HTTP cron service works. On Vercel **Hobby**, use
+[cron-job.org](https://cron-job.org/en/) because Vercel only allows daily Cron
+Jobs on that plan:
+
+- `POST https://<project>.vercel.app/api/v1/cron/rates` every 1 minute
+- `POST https://<project>.vercel.app/api/v1/cron/maintenance` daily at 03:15
+- Header `X-Cron-Secret: <CRON_SECRET>` on both
+
 The endpoint returns `502` on provider failure and `status: skipped` if a previous
 poll is still running.
 
@@ -184,7 +190,7 @@ docs/
   publications quickly but is not intraday tick data.
 - Turso is remote, so Vercel has no filesystem dependency. The poll's overlap
   guard is still per instance; use a DB lock if you expect concurrent invocations.
-- Vercel Cron for a once-per-minute schedule requires a plan that allows it.
+- Vercel Hobby does not allow per-minute Cron Jobs; cron-job.org handles the schedule.
 - Alerts are global; per-device criteria (`brother wants < 140 NPR`) needs the
   alert-ownership schema change described in the backend README.
 - The app is built on Flutter 3.50's `material_ui` package. `reactive_forms`

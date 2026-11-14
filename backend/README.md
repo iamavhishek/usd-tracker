@@ -20,7 +20,7 @@ lets you deploy the web process without a background loop.
 | Push         | `firebase-admin` → FCM HTTP v1                      |
 | Scheduling   | external cron → `/api/v1/cron/rates` (no `cron` pkg)|
 | Tests        | Bun test + supertest                                |
-| Deploy       | Docker or Vercel (`api/index.ts` + Vercel Cron)      |
+| Deploy       | Docker or Vercel (`api/index.ts` + cron-job.org)     |
 
 ## Quick start
 
@@ -68,8 +68,8 @@ Authorization: Bearer <CRON_SECRET>
 | GET/POST | `/api/v1/cron/rates`   | fetch rates, evaluate alerts, push |
 | GET/POST | `/api/v1/cron/maintenance` | apply history/notification retention |
 
-Both GET and POST are supported so Vercel Cron, cron-job.org, EasyCron, GitHub
-Actions, or a shell crontab work without adapters.
+Both GET and POST are supported, so cron-job.org, EasyCron, GitHub Actions, a
+shell crontab, or any HTTP scheduler work without adapters.
 
 ```bash
 # poll every minute
@@ -90,20 +90,28 @@ Crontab:
 15 3 * * * curl -fsS -X POST -H "X-Cron-Secret: $CRON_SECRET" https://api.example.com/api/v1/cron/maintenance >> /var/log/usd-maintenance.log 2>&1
 ```
 
-Vercel `vercel.json`:
+### cron-job.org
 
-```json
-{
-  "crons": [
-    { "path": "/api/v1/cron/rates", "schedule": "* * * * *" },
-    { "path": "/api/v1/cron/maintenance", "schedule": "15 3 * * *" }
-  ]
-}
-```
+Vercel **Hobby** only allows daily Cron Jobs, so use cron-job.org for the
+per-minute poll:
 
-Vercel Cron sends `Authorization: Bearer $CRON_SECRET` automatically when a
-`CRON_SECRET` environment variable exists. If `CRON_SECRET` is unset, the
-endpoint returns `503`; there is no open cron route.
+1. URL: `https://<your-project>.vercel.app/api/v1/cron/rates`
+2. Schedule: every **1 minute**
+3. Method: `POST` (GET also works)
+4. Header: `X-Cron-Secret: <CRON_SECRET>`
+5. Enable failure notifications.
+
+Add a second job for retention:
+
+1. URL: `https://<your-project>.vercel.app/api/v1/cron/maintenance`
+2. Schedule: daily at `03:15`
+3. Method: `POST`
+4. Same `X-Cron-Secret` header.
+
+`Authorization: Bearer <CRON_SECRET>` is accepted instead of the custom header.
+If `CRON_SECRET` is unset, the endpoint returns `503`; there is no open cron
+route. Do not add `crons` to `vercel.json` on Hobby — Vercel rejects schedules
+more frequent than once per day.
 
 If a poll overlaps the previous one, it returns `status: "skipped"` instead of
 stacking work. Provider failures return `502`; the last poll state is still
@@ -262,18 +270,17 @@ Vercel is supported with Turso Cloud (not the local `file:` URL):
 2. Add environment variables: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`,
    `API_KEY`, `CRON_SECRET` and `FIREBASE_SERVICE_ACCOUNT_BASE64`.
 3. Apply migrations against Turso (`bun run db:migrate` with the Turso env).
-4. Deploy. `vercel.json` routes all requests to `api/index.ts` and schedules:
-   - `/api/v1/cron/rates` every minute
-   - `/api/v1/cron/maintenance` at 03:15
-5. Vercel sends `Authorization: Bearer $CRON_SECRET` to cron routes, so
-   `CRON_SECRET` must be set in Vercel.
+4. Deploy. `vercel.json` routes all requests to `api/index.ts`; it intentionally
+   contains **no `crons`** because Vercel Hobby only allows daily schedules.
+5. Create two cron-job.org jobs pointing at `/api/v1/cron/rates` (every minute)
+   and `/api/v1/cron/maintenance` (daily), both with `X-Cron-Secret`.
 
 `vercel.json` sets `"framework": null` to keep Vercel on the Node.js function
 runtime. `includeFiles: "drizzle/**"` bundles migrations if you need
 auto-migrate at runtime; for lower cold-start cost set
-`DATABASE_AUTO_MIGRATE=false` after the initial migration. A once-per-minute Vercel Cron requires a plan that supports
-that frequency. The handler uses the Node runtime; Turso is accessed over HTTPS,
-so no persistent filesystem is required.
+`DATABASE_AUTO_MIGRATE=false` after the initial migration. The handler uses the
+Node runtime; Turso is accessed over HTTPS, so no persistent filesystem is
+required. Scheduling is handled by cron-job.org, not Vercel Cron.
 
 ## Tests
 
