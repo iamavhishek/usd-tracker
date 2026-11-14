@@ -6,9 +6,9 @@ backend contract the app relies on.
 
 ## Base URL
 
-`http://<host>:3000/api/v1`. The app defaults to `10.0.2.2` for Android
-emulators; use your LAN IP or a deployed HTTPS URL on a physical device.
-Override with `--dart-define=API_BASE_URL=…`.
+`https://usd-tracker-mauve.vercel.app/api/v1` by default. For local development
+use `--dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1` (Android emulator)
+or your machine's LAN IP on a physical device.
 
 All mutating calls send `X-API-Key` when the backend has `API_KEY` set.
 

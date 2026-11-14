@@ -18,6 +18,10 @@ final class AppEnv {
 
   bool get hasApiKey => apiKey.isNotEmpty;
 
+  /// Production API. Local development overrides this with API_BASE_URL.
+  static const String deployedBaseUrl =
+      'https://usd-tracker-mauve.vercel.app/api/v1';
+
   static AppEnv fromDefines() {
     const String flavorValue = String.fromEnvironment(
       'APP_ENV',
@@ -31,16 +35,9 @@ final class AppEnv {
         ? AppFlavor.prod
         : AppFlavor.dev;
 
-    if (flavor == AppFlavor.prod && baseUrlOverride.isEmpty) {
-      throw StateError(
-        'API_BASE_URL must be provided for APP_ENV=prod '
-        '(use --dart-define=API_BASE_URL=https://…).',
-      );
-    }
-
     final String baseUrl = baseUrlOverride.isNotEmpty
         ? baseUrlOverride
-        : 'http://10.0.2.2:3000/api/v1';
+        : deployedBaseUrl;
 
     return AppEnv(
       flavor: flavor,

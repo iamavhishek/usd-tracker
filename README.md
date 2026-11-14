@@ -33,20 +33,20 @@ bun run dev                   # http://localhost:3000/api/v1
 curl -X POST -H "x-cron-secret: $CRON_SECRET" \
   http://localhost:3000/api/v1/cron/rates
 
-# 3. Android app
+# 3. Android app (uses the deployed backend by default)
 cd app
 flutter pub get
-flutter run \
-  --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1 \
-  --dart-define=API_KEY=dev-secret
+flutter run --dart-define=API_KEY=<deployed-api-key>
+
+# Local backend instead:
+# flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1
 ```
 
-- API: <http://localhost:3000/api/v1>
-- Health: <http://localhost:3000/api/v1/health>
+- App default API: <https://usd-tracker-mauve.vercel.app/api/v1>
+- Local API: <http://localhost:3000/api/v1>
 
-Without `API_BASE_URL` the app uses `http://10.0.2.2:3000/api/v1` (Android
-emulator host). On a physical device pass your machine's LAN IP or a deployed
-HTTPS URL.
+Without `API_BASE_URL` the app uses the deployed backend. On a physical device
+against a local backend, pass your machine's LAN IP.
 
 ## External cron
 

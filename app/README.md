@@ -23,21 +23,24 @@ Built with the project's standard stack:
 cd app
 flutter pub get
 
-# Android emulator (backend on the same machine)
+# Deployed backend (default)
+flutter run --dart-define=API_KEY=<deployed-api-key>
+
+# Local backend on the same machine (Android emulator)
 flutter run \
   --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1 \
   --dart-define=API_KEY=dev-secret
 ```
 
-With no `API_BASE_URL`, the app uses the Android emulator host `10.0.2.2`.
-On a physical device pass your computer's LAN IP (or a deployed HTTPS URL).
-`API_KEY` is optional; it must match the backend's `API_KEY` for registering
-devices and managing alerts.
+With no `API_BASE_URL`, the app uses
+`https://usd-tracker-mauve.vercel.app/api/v1`. For a physical device on a local
+backend, pass your computer's LAN IP. `API_KEY` is optional; it must match the
+backend's `API_KEY` for registering devices and managing alerts.
 
 | Define | Default | Meaning |
 | --- | --- | --- |
-| `APP_ENV` | `dev` | `prod` requires an explicit `API_BASE_URL` |
-| `API_BASE_URL` | `http://10.0.2.2:3000/api/v1` | Full base URL including `/api/v1` |
+| `APP_ENV` | `dev` | Build flavor label |
+| `API_BASE_URL` | `https://usd-tracker-mauve.vercel.app/api/v1` | Full base URL including `/api/v1`; override for local dev |
 | `API_KEY` | empty | Sent as `X-API-Key` on every request |
 | `QUOTE` | `NPR` | Currency the dashboard/alerts default to |
 | `INITIAL_ROUTE` | `/rates` | Demo/debug only: open a tab directly |
