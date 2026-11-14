@@ -1,0 +1,188 @@
+# USD Tracker
+
+A USD/NPR exchange-rate tracker with a **lightweight Express + TypeScript +
+Drizzle** backend and a **Flutter Android** client.
+
+- **Backend** (`backend/`) — Express 5 on Bun. Fetches
+  [Frankfurter](https://frankfurter.dev) rates on demand, stores changes in
+  SQLite via Drizzle ORM, evaluates threshold alerts and sends Firebase Cloud
+  Messaging pushes. **No in-process cron**: an external scheduler calls a secured
+  endpoint every minute.
+- **App** (`app/`) — Flutter 3.50 client on `material_ui`, with Bloc + Dio +
+  GoRouter + Freezed + Hive CE + `get_it` and a forest-green / warm-bone design
+  system.
+
+## Screens
+
+| Rate | Alerts |
+| --- | --- |
+| ![Rate screen](docs/screenshots/rates.png) | ![Alerts screen](docs/screenshots/alerts.png) |
+
+![Push notification](docs/screenshots/android-notification.png)
+
+## Quick start
+
+```bash
+# 1. Backend
+cd backend
+bun install
+cp .env.example .env          # set API_KEY, CRON_SECRET, Firebase base64
+bun run dev                   # http://localhost:3000/api/v1
+
+# 2. Trigger the poll the external scheduler would call
+curl -X POST -H "x-cron-secret: $CRON_SECRET" \
+  http://localhost:3000/api/v1/cron/rates
+
+# 3. Android app
+cd app
+flutter pub get
+flutter run \
+  --dart-define=API_BASE_URL=http://10.0.2.2:3000/api/v1 \
+  --dart-define=API_KEY=dev-secret
+```
+
+- API: <http://localhost:3000/api/v1>
+- Health: <http://localhost:3000/api/v1/health>
+
+Without `API_BASE_URL` the app uses `http://10.0.2.2:3000/api/v1` (Android
+emulator host). On a physical device pass your machine's LAN IP or a deployed
+HTTPS URL.
+
+## External cron
+
+The API does not schedule anything itself. The scheduler calls:
+
+```http
+GET or POST /api/v1/cron/rates
+X-Cron-Secret: <CRON_SECRET>
+```
+
+and once a day:
+
+```http
+POST /api/v1/cron/maintenance
+```
+
+Any cron service works (cron-job.org, EasyCron, GitHub Actions, Railway cron,
+Vercel Cron, a shell crontab). Vercel Cron sends GET and supports a Bearer secret.
+The endpoint returns `502` on provider failure and `status: skipped` if a previous
+poll is still running.
+
+## How it works
+
+```
+External cron ──► POST /api/v1/cron/rates
+                       │
+                       ▼
+              Fetch Frankfurter v2
+                       │
+              store changed rate (Drizzle/SQLite)
+                       │
+              evaluate threshold rules
+                       │
+              FCM multicast to registered devices
+```
+
+The web process can sleep between requests; state lives in SQLite. For a
+serverless host, replace SQLite with Postgres (Neon) first.
+
+## API
+
+```
+GET    /api/v1/health
+GET    /api/v1/rates
+GET    /api/v1/rates/:quote
+GET    /api/v1/rates/:quote/history?limit=100
+POST   /api/v1/rates/refresh                 X-API-Key
+POST   /api/v1/rates/:quote/backfill?days=30  X-API-Key
+GET    /api/v1/cron/rates                    X-Cron-Secret
+POST   /api/v1/cron/rates                    X-Cron-Secret
+GET    /api/v1/cron/maintenance              X-Cron-Secret
+POST   /api/v1/cron/maintenance              X-Cron-Secret
+POST   /api/v1/devices                       X-API-Key
+GET    /api/v1/devices                       X-API-Key
+DELETE /api/v1/devices/:token                X-API-Key
+GET    /api/v1/alerts                        X-API-Key
+POST   /api/v1/alerts                        X-API-Key
+PATCH  /api/v1/alerts/:id                    X-API-Key
+DELETE /api/v1/alerts/:id                    X-API-Key
+GET    /api/v1/notifications?limit=50        X-API-Key
+POST   /api/v1/notifications/test            X-API-Key
+```
+
+Alerts are edge-triggered with a cooldown. They are currently **global**, not
+per device/user; see the backend README.
+
+## Configuration
+
+- Backend: [`backend/.env.example`](backend/.env.example) — database, API key,
+  `CRON_SECRET`, quotes, Firebase credential, notification behaviour.
+- App: build-time defines documented in [`app/README.md`](app/README.md).
+
+## Firebase
+
+1. Create a Firebase project and register the Android package
+   `np.com.abhishekd.usdTracker`.
+2. Put the client config at `app/android/app/google-services.json`.
+3. Backend: use a service account JSON, locally via
+   `FIREBASE_SERVICE_ACCOUNT_PATH` or deployed as
+   `FIREBASE_SERVICE_ACCOUNT_BASE64` (sensitive).
+4. In the app: **Settings → Enable notifications**; test with
+   `POST /api/v1/notifications/test`.
+
+Full details: [`docs/flutter-integration.md`](docs/flutter-integration.md).
+
+## Tests
+
+```bash
+# Backend: 11 unit + 6 e2e
+cd backend
+bun test
+bun run test:e2e
+
+# App: analyzer, 18 tests, design-token guard
+cd app
+flutter analyze
+flutter test
+bash scripts/check_design_tokens.sh lib
+```
+
+## Layout
+
+```
+backend/
+  src/
+    app.ts / server.ts
+    config/env.ts
+    db/{schema,database,app-state}.ts
+    features/{rates,alerts,devices,notifications,health,cron,maintenance}/
+    shared/{errors,http,logger}.ts
+  drizzle/                 CLI-generated migrations
+  test/                    unit + e2e
+app/
+  lib/{app,core,features}
+  vendor/reactive_forms/   pinned fork for material_ui
+  test/
+docs/
+  flutter-integration.md
+```
+
+## Requirements
+
+- Bun **1.3+** (built with 1.4)
+- Flutter **3.50** / Dart 3.14 and Android SDK with API 37
+- Firebase project for real push (optional for development)
+
+## Notes
+
+- **External scheduler is required.** Nothing polls on startup; call
+  `/api/v1/cron/rates` every minute.
+- Frankfurter publishes official **daily** rates; minute polling catches new
+  publications quickly but is not intraday tick data.
+- SQLite + a single Express process assume one replica. For Vercel, migrate to
+  Postgres first; SQLite's filesystem is ephemeral there.
+- Alerts are global; per-device criteria (`brother wants < 140 NPR`) needs the
+  alert-ownership schema change described in the backend README.
+- The app is built on Flutter 3.50's `material_ui` package. `reactive_forms`
+  upstream still targets the deprecated SDK Material library, so it is vendored
+  under `app/vendor/reactive_forms` with its imports migrated.

@@ -1,0 +1,13 @@
+# macOS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Tooling caches created by local setup
+.npm-cache/
+.bun-cache/
+
+# Local secrets and databases at the repo root
+.env
+.env.local
+secrets/

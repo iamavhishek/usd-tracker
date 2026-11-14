@@ -1,0 +1,49 @@
+{
+  "name": "usd-tracker-api",
+  "version": "1.0.0",
+  "description": "USD exchange-rate tracker API: Express + Drizzle/SQLite, external cron polling and Firebase Cloud Messaging alerts",
+  "author": "Yubaraj Dahal",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "bun@1.4.0",
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "start": "bun src/server.ts",
+    "start:debug": "bun --inspect src/server.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start:prod": "bun dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "lint": "oxlint src test",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:cov": "bun test --coverage",
+    "test:e2e": "bun test ./test/app.e2e-spec.ts"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "drizzle-orm": "^0.45.4",
+    "express": "^5.3.0",
+    "firebase-admin": "^14.5.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "@types/supertest": "^7.0.0",
+    "drizzle-kit": "^0.31.11",
+    "oxlint": "^1.58.0",
+    "prettier": "^3.4.2",
+    "supertest": "^7.0.0",
+    "typescript": "^6.0.2"
+  }
+}

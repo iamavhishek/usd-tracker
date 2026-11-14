@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "505640227445",
+    "project_id": "usd-tracker-598fc",
+    "storage_bucket": "usd-tracker-598fc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:505640227445:android:00a258d94fb1f17f641e3c",
+        "android_client_info": {
+          "package_name": "np.com.abhishekd.usdTracker"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHqa819t3MVjmZ7rb3mgLjQuqi5PSDaxU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
