@@ -269,7 +269,7 @@ Vercel is supported with Turso Cloud (not the local `file:` URL):
    `CRON_SECRET` must be set in Vercel.
 
 `vercel.json` sets `"framework": null` to keep Vercel on the Node.js function
-runtime. `includeFiles: ["drizzle/**"]` bundles migrations if you need
+runtime. `includeFiles: "drizzle/**"` bundles migrations if you need
 auto-migrate at runtime; for lower cold-start cost set
 `DATABASE_AUTO_MIGRATE=false` after the initial migration. A once-per-minute Vercel Cron requires a plan that supports
 that frequency. The handler uses the Node runtime; Turso is accessed over HTTPS,

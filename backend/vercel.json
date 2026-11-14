@@ -3,9 +3,7 @@
   "framework": null,
   "functions": {
     "api/index.ts": {
-      "includeFiles": [
-        "drizzle/**"
-      ]
+      "includeFiles": "drizzle/**"
     }
   },
   "installCommand": "bun install",
