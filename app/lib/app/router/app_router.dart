@@ -21,6 +21,11 @@ GoRouter createRouter() {
     ),
     debugLogDiagnostics: kDebugMode,
     routes: <RouteBase>[
+      // Old push payloads used /rates/<quote>; the app has one rate screen.
+      GoRoute(
+        path: '/rates/:quote',
+        redirect: (BuildContext context, GoRouterState state) => Routes.rates,
+      ),
       StatefulShellRoute.indexedStack(
         builder:
             (

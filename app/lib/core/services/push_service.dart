@@ -12,4 +12,7 @@ abstract class PushService {
   Future<String?> getToken();
 
   Stream<String> get tokenRefresh;
+
+  /// Routes carried by a tapped notification (foreground/background/launch).
+  Stream<String> get openedRoute;
 }

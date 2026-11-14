@@ -29,8 +29,11 @@ class FirebasePushService implements PushService {
       FlutterLocalNotificationsPlugin();
   final StreamController<String> _tokenRefresh =
       StreamController<String>.broadcast();
+  final StreamController<String> _openedRoute =
+      StreamController<String>.broadcast();
 
   StreamSubscription<RemoteMessage>? _messageSubscription;
+  StreamSubscription<RemoteMessage>? _openedSubscription;
   StreamSubscription<String>? _refreshSubscription;
   Future<PushStatus>? _initialising;
   PushStatus _status = const PushStatus();
@@ -42,6 +45,9 @@ class FirebasePushService implements PushService {
 
   @override
   Stream<String> get tokenRefresh => _tokenRefresh.stream;
+
+  @override
+  Stream<String> get openedRoute => _openedRoute.stream;
 
   @override
   Future<PushStatus> initialize() {
@@ -79,6 +85,14 @@ class FirebasePushService implements PushService {
       _messageSubscription = FirebaseMessaging.onMessage.listen(
         _showForegroundNotification,
       );
+      _openedSubscription = FirebaseMessaging.onMessageOpenedApp.listen(
+        _handleOpenedMessage,
+      );
+
+      final RemoteMessage? initial =
+          await FirebaseMessaging.instance.getInitialMessage();
+      if (initial != null) _handleOpenedMessage(initial);
+
       // ignore: deprecated_member_use
       _refreshSubscription = FirebaseMessaging.instance.onTokenRefresh.listen(
         _onTokenRefresh,
@@ -149,6 +163,16 @@ class FirebasePushService implements PushService {
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
       ),
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        final String? payload = response.payload;
+        if (payload == null) return;
+        try {
+          final Object? data = jsonDecode(payload);
+          if (data is Map<String, dynamic>) _emitRoute(data['route']);
+        } on Object {
+          // Ignore malformed local-notification payloads.
+        }
+      },
     );
 
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
@@ -167,6 +191,16 @@ class FirebasePushService implements PushService {
 
   void _onTokenRefresh(String token) {
     _tokenRefresh.add(token);
+  }
+
+  void _handleOpenedMessage(RemoteMessage message) {
+    _emitRoute(message.data['route']);
+  }
+
+  void _emitRoute(Object? route) {
+    if (route is String && route.startsWith('/') && route.isNotEmpty) {
+      _openedRoute.add(route);
+    }
   }
 
   Future<void> _showForegroundNotification(RemoteMessage message) async {
@@ -193,7 +227,9 @@ class FirebasePushService implements PushService {
   /// Called only if the service is ever torn down (tests, hot restart).
   Future<void> dispose() async {
     await _messageSubscription?.cancel();
+    await _openedSubscription?.cancel();
     await _refreshSubscription?.cancel();
     await _tokenRefresh.close();
+    await _openedRoute.close();
   }
 }

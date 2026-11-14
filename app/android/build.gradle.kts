@@ -19,6 +19,14 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
+// AGP 9.3's lint crashes inside firebase_core (List.removeLast) on this
+// toolchain. Release builds don't need lint; stability checks run separately.
+subprojects {
+    tasks.matching { it.name.startsWith("lintVital") }.configureEach {
+        enabled = false
+    }
+}
+
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
 }

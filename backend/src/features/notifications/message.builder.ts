@@ -58,7 +58,7 @@ export function buildAlertMessage(input: AlertMessageInput): PushMessage {
       condition: input.condition,
       threshold: String(input.threshold),
       ...(input.alertId !== undefined ? { alertId: String(input.alertId) } : {}),
-      route: `/rates/${input.quote}`,
+      route: '/rates',
     },
   };
 }
@@ -79,7 +79,7 @@ export function buildRateChangeMessage(
       previousRate: String(input.previousRate),
       changePercent: String(input.changePercent),
       rateDate: input.rateDate,
-      route: `/rates/${input.quote}`,
+      route: '/rates',
     },
   };
 }
@@ -94,7 +94,7 @@ export function buildTickMessage(input: TickMessageInput): PushMessage {
       quote: input.quote,
       rate: String(input.rate),
       rateDate: input.rateDate,
-      route: `/rates/${input.quote}`,
+      route: '/rates',
     },
   };
 }
@@ -109,7 +109,7 @@ export function buildTestMessage(input: TestMessageInput): PushMessage {
       type: 'test',
       base: input.base,
       quote: input.quote,
-      route: `/rates/${input.quote}`,
+      route: '/rates',
     },
   };
 }

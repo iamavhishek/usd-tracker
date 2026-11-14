@@ -4,6 +4,7 @@ import 'dart:ui' show PlatformDispatcher;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:usd_tracker/firebase_options.dart';
 
@@ -37,9 +38,12 @@ Future<void> bootstrap() async {
   final AppEnv env = AppEnv.fromDefines();
   configureDependencies(env, cacheBox);
 
+  final GoRouter router = createRouter();
+
   // Wire push listeners without prompting; the prompt is requested from
   // Settings when the user enables notifications.
-  unawaited(getIt<PushService>().initialize());
-
-  runApp(App(router: createRouter()));
+  final PushService push = getIt<PushService>();
+  push.openedRoute.listen(router.go);
+  runApp(App(router: router));
+  unawaited(push.initialize());
 }
