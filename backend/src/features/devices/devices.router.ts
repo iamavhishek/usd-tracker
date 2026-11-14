@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { AppConfig } from '../../config/env.js';
-import { HttpError } from '../../shared/errors.js';
+import { HttpError, asyncHandler } from '../../shared/errors.js';
 import { requireApiKey, validateBody } from '../../shared/http.js';
 import { registerDeviceSchema } from './devices.schemas.js';
 import type { DevicesService } from './devices.service.js';
@@ -17,21 +17,27 @@ export function devicesRouter({ config, devices }: DevicesRouterDeps): Router {
   router.post(
     '/',
     validateBody(registerDeviceSchema),
-    (request, response) => {
-      response.status(201).json(devices.register(request.body));
-    },
+    asyncHandler(async (request, response) => {
+      response.status(201).json(await devices.register(request.body));
+    }),
   );
 
-  router.get('/', (_request, response) => {
-    response.json(devices.list());
-  });
+  router.get(
+    '/',
+    asyncHandler(async (_request, response) => {
+      response.json(await devices.list());
+    }),
+  );
 
-  router.delete('/:token', (request, response) => {
-    const token =
-      typeof request.params.token === 'string' ? request.params.token : '';
-    if (!token) throw new HttpError(400, 'token is required');
-    response.json(devices.remove(token));
-  });
+  router.delete(
+    '/:token',
+    asyncHandler(async (request, response) => {
+      const token =
+        typeof request.params.token === 'string' ? request.params.token : '';
+      if (!token) throw new HttpError(400, 'token is required');
+      response.json(await devices.remove(token));
+    }),
+  );
 
   return router;
 }

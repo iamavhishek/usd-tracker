@@ -10,10 +10,10 @@ export class MaintenanceService {
     private readonly notifications: NotificationsRepository,
   ) {}
 
-  cleanup(now = Date.now()): {
+  async cleanup(now = Date.now()): Promise<{
     snapshotsDeleted: number;
     notificationsDeleted: number;
-  } {
+  }> {
     const rateCutoff = new Date(
       now - this.config.historyRetentionDays * 86_400_000,
     ).toISOString();
@@ -21,9 +21,9 @@ export class MaintenanceService {
       now - this.config.notificationRetentionDays * 86_400_000,
     ).toISOString();
 
-    const snapshotsDeleted = this.rates.deleteOlderThan(rateCutoff);
+    const snapshotsDeleted = await this.rates.deleteOlderThan(rateCutoff);
     const notificationsDeleted =
-      this.notifications.deleteOlderThan(notificationCutoff);
+      await this.notifications.deleteOlderThan(notificationCutoff);
 
     if (snapshotsDeleted > 0 || notificationsDeleted > 0) {
       logger.info(

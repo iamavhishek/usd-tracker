@@ -51,14 +51,14 @@ export class PollingService {
     }
 
     this.inFlight = true;
-    this.pruneOldData();
+    await this.pruneOldData();
 
     try {
       const fetched = await this.provider.fetchRates(
         this.config.baseCurrency,
         this.config.quotes,
       );
-      const ingested = this.rates.ingest(fetched);
+      const ingested = await this.rates.ingest(fetched);
       const notifications = await this.dispatch(ingested);
       const finishedAt = new Date();
 
@@ -78,7 +78,7 @@ export class PollingService {
         notifications,
       };
 
-      this.state.set(LAST_POLL_KEY, summary);
+      await this.state.set(LAST_POLL_KEY, summary);
       logger.info(
         `Poll ${trigger} ok in ${summary.durationMs}ms — ` +
           `${ingested.filter((rate) => rate.changed).length}/${ingested.length} changed, ` +
@@ -101,7 +101,7 @@ export class PollingService {
         error: message,
       };
 
-      this.state.set(LAST_POLL_KEY, summary);
+      await this.state.set(LAST_POLL_KEY, summary);
       logger.error(`Poll ${trigger} failed: ${message}`);
       return summary;
     } finally {
@@ -109,9 +109,9 @@ export class PollingService {
     }
   }
 
-  private pruneOldData(): void {
+  private async pruneOldData(): Promise<void> {
     try {
-      this.maintenance.cleanup();
+      await this.maintenance.cleanup();
     } catch (error) {
       logger.warn(
         `Retention cleanup failed: ${error instanceof Error ? error.message : String(error)}`,
@@ -127,7 +127,7 @@ export class PollingService {
 
     for (const item of ingested) {
       if (item.previousRate !== null) {
-        for (const rule of this.alerts.enabledForQuote(item.quote)) {
+        for (const rule of await this.alerts.enabledForQuote(item.quote)) {
           const triggered = shouldTriggerAlert({
             condition: rule.condition,
             threshold: rule.threshold,
@@ -148,7 +148,7 @@ export class PollingService {
             threshold: rule.threshold,
             ruleName: rule.name,
           });
-          this.alerts.markTriggered(rule.id, nowIso);
+          await this.alerts.markTriggered(rule.id, nowIso);
           this.tally(outcome, tally);
         }
 

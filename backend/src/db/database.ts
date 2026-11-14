@@ -1,30 +1,36 @@
-import { Database } from 'bun:sqlite';
-import { drizzle, type BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
-import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
+import { createClient, type Client } from '@libsql/client';
+import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
+import { migrate } from 'drizzle-orm/libsql/migrator';
 import { existsSync, mkdirSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import type { AppConfig } from '../config/env.js';
 import { logger } from '../shared/logger.js';
 import * as schema from './schema.js';
 
 export interface DatabaseConnection {
-  sqlite: Database;
-  db: BunSQLiteDatabase<typeof schema>;
-  ping(): boolean;
+  client: Client;
+  db: LibSQLDatabase<typeof schema>;
+  ping(): Promise<boolean>;
   close(): void;
 }
 
-export function createDatabase(config: AppConfig): DatabaseConnection {
-  if (config.databasePath !== ':memory:') {
-    mkdirSync(dirname(config.databasePath), { recursive: true });
-  }
+function ensureLocalDirectory(url: string): void {
+  if (!url.startsWith('file:')) return;
+  const path = url.slice('file:'.length);
+  if (!path || path === ':memory:' || path.startsWith(':memory:')) return;
+  mkdirSync(dirname(resolve(process.cwd(), path)), { recursive: true });
+}
 
-  const sqlite = new Database(config.databasePath, { create: true });
-  sqlite.exec('PRAGMA journal_mode = WAL;');
-  sqlite.exec('PRAGMA busy_timeout = 5000;');
-  sqlite.exec('PRAGMA foreign_keys = ON;');
+export async function createDatabase(
+  config: AppConfig,
+): Promise<DatabaseConnection> {
+  ensureLocalDirectory(config.databaseUrl);
 
-  const db = drizzle(sqlite, { schema });
+  const client = createClient({
+    url: config.databaseUrl,
+    ...(config.tursoAuthToken ? { authToken: config.tursoAuthToken } : {}),
+  });
+  const db = drizzle(client, { schema });
 
   if (config.databaseAutoMigrate) {
     if (!existsSync(config.migrationsDir)) {
@@ -33,17 +39,17 @@ export function createDatabase(config: AppConfig): DatabaseConnection {
           'Run "bun run db:generate" and deploy the drizzle/ directory.',
       );
     }
-    migrate(db, { migrationsFolder: config.migrationsDir });
+    await migrate(db, { migrationsFolder: config.migrationsDir });
   } else {
     logger.warn('Automatic migrations are disabled');
   }
 
   return {
-    sqlite,
+    client,
     db,
-    ping(): boolean {
+    async ping(): Promise<boolean> {
       try {
-        sqlite.query('select 1 as ok').get();
+        await client.execute('select 1 as ok');
         return true;
       } catch (error) {
         logger.error('Database ping failed', error);
@@ -51,7 +57,7 @@ export function createDatabase(config: AppConfig): DatabaseConnection {
       }
     },
     close(): void {
-      sqlite.close();
+      client.close();
     },
   };
 }

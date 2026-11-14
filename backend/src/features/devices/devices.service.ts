@@ -21,7 +21,7 @@ export class DevicesService {
     private readonly config: AppConfig,
   ) {}
 
-  register(input: RegisterDeviceInput): DeviceSummary {
+  async register(input: RegisterDeviceInput): Promise<DeviceSummary> {
     const quote = (input.quote ?? this.config.quotes[0] ?? '').toUpperCase();
     if (!this.config.quotes.includes(quote)) {
       throw new HttpError(
@@ -30,7 +30,7 @@ export class DevicesService {
       );
     }
 
-    const device = this.repository.upsert({
+    const device = await this.repository.upsert({
       token: input.token.trim(),
       platform: input.platform ?? 'unknown',
       quote,
@@ -43,23 +43,24 @@ export class DevicesService {
     return this.toSummary(device);
   }
 
-  list(): DeviceSummary[] {
-    return this.repository.list().map((device) => this.toSummary(device));
+  async list(): Promise<DeviceSummary[]> {
+    const devices = await this.repository.list();
+    return devices.map((device) => this.toSummary(device));
   }
 
-  remove(token: string): { removed: boolean } {
-    return { removed: this.repository.remove(token.trim()) };
+  async remove(token: string): Promise<{ removed: boolean }> {
+    return { removed: await this.repository.remove(token.trim()) };
   }
 
-  activeTokensForQuote(quote: string): string[] {
+  async activeTokensForQuote(quote: string): Promise<string[]> {
     return this.repository.activeTokensForQuote(quote);
   }
 
-  removeTokens(tokens: string[]): number {
+  async removeTokens(tokens: string[]): Promise<number> {
     return this.repository.removeMany(tokens);
   }
 
-  count(): number {
+  async count(): Promise<number> {
     return this.repository.countActive();
   }
 

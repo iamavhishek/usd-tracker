@@ -93,7 +93,7 @@ export class NotificationsService {
     const quote = (input.quote ?? this.config.quotes[0] ?? base).toUpperCase();
     const tokens = input.token
       ? [input.token]
-      : this.devices.activeTokensForQuote(quote);
+      : await this.devices.activeTokensForQuote(quote);
 
     return this.deliver(
       'test',
@@ -108,7 +108,7 @@ export class NotificationsService {
     );
   }
 
-  history(limit: number): Notification[] {
+  async history(limit: number): Promise<Notification[]> {
     return this.repository.recent(limit);
   }
 
@@ -119,11 +119,11 @@ export class NotificationsService {
     explicitTokens?: string[],
   ): Promise<NotificationOutcome> {
     const tokens =
-      explicitTokens ?? this.devices.activeTokensForQuote(context.quote);
+      explicitTokens ?? (await this.devices.activeTokensForQuote(context.quote));
     const deviceCount = tokens.length;
 
     if (deviceCount === 0) {
-      this.repository.create({
+      await this.repository.create({
         type,
         title: message.title,
         body: message.body,
@@ -155,7 +155,7 @@ export class NotificationsService {
     const result = await this.fcm.send(tokens, message);
 
     if (result.invalidTokens.length > 0) {
-      const pruned = this.devices.removeTokens(result.invalidTokens);
+      const pruned = await this.devices.removeTokens(result.invalidTokens);
       logger.info(`Removed ${pruned} invalid FCM token(s)`);
     }
 
@@ -168,7 +168,7 @@ export class NotificationsService {
       ...(result.error ? { skippedReason: result.error } : {}),
     };
 
-    this.repository.create({
+    await this.repository.create({
       type,
       title: message.title,
       body: message.body,

@@ -1,5 +1,5 @@
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
 import { and, desc, eq, lt } from 'drizzle-orm';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import {
   rateSnapshots,
   type NewRateSnapshot,
@@ -8,23 +8,23 @@ import {
 import type * as schema from '../../db/schema.js';
 
 export class RatesRepository {
-  constructor(private readonly db: BunSQLiteDatabase<typeof schema>) {}
+  constructor(private readonly db: LibSQLDatabase<typeof schema>) {}
 
-  latest(quote: string): RateSnapshot | undefined {
-    return this.db
+  async latest(quote: string): Promise<RateSnapshot | undefined> {
+    const rows = await this.db
       .select()
       .from(rateSnapshots)
       .where(eq(rateSnapshots.quote, quote))
       .orderBy(desc(rateSnapshots.fetchedAt), desc(rateSnapshots.id))
-      .limit(1)
-      .get();
+      .limit(1);
+    return rows[0];
   }
 
-  latestBefore(
+  async latestBefore(
     quote: string,
     current: RateSnapshot,
-  ): RateSnapshot | undefined {
-    return this.db
+  ): Promise<RateSnapshot | undefined> {
+    const rows = await this.db
       .select()
       .from(rateSnapshots)
       .where(
@@ -34,51 +34,50 @@ export class RatesRepository {
         ),
       )
       .orderBy(desc(rateSnapshots.fetchedAt), desc(rateSnapshots.id))
-      .limit(1)
-      .get();
+      .limit(1);
+    return rows[0];
   }
 
-  insert(snapshot: NewRateSnapshot): number {
-    return this.db
+  async insert(snapshot: NewRateSnapshot): Promise<number> {
+    const rows = await this.db
       .insert(rateSnapshots)
       .values(snapshot)
       .onConflictDoNothing()
-      .returning({ id: rateSnapshots.id })
-      .all().length;
+      .returning({ id: rateSnapshots.id });
+    return rows.length;
   }
 
-  insertMany(snapshots: NewRateSnapshot[]): number {
+  async insertMany(snapshots: NewRateSnapshot[]): Promise<number> {
     if (snapshots.length === 0) return 0;
 
-    return this.db.transaction((tx) => {
+    return this.db.transaction(async (tx) => {
       let inserted = 0;
       for (const snapshot of snapshots) {
-        inserted += tx
+        const rows = await tx
           .insert(rateSnapshots)
           .values(snapshot)
           .onConflictDoNothing()
-          .returning({ id: rateSnapshots.id })
-          .all().length;
+          .returning({ id: rateSnapshots.id });
+        inserted += rows.length;
       }
       return inserted;
     });
   }
 
-  history(quote: string, limit: number): RateSnapshot[] {
+  async history(quote: string, limit: number): Promise<RateSnapshot[]> {
     return this.db
       .select()
       .from(rateSnapshots)
       .where(eq(rateSnapshots.quote, quote))
       .orderBy(desc(rateSnapshots.fetchedAt), desc(rateSnapshots.id))
-      .limit(limit)
-      .all();
+      .limit(limit);
   }
 
-  deleteOlderThan(cutoffIso: string): number {
-    return this.db
+  async deleteOlderThan(cutoffIso: string): Promise<number> {
+    const rows = await this.db
       .delete(rateSnapshots)
       .where(lt(rateSnapshots.fetchedAt, cutoffIso))
-      .returning({ id: rateSnapshots.id })
-      .all().length;
+      .returning({ id: rateSnapshots.id });
+    return rows.length;
   }
 }

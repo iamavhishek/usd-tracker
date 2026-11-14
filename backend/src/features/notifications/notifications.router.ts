@@ -41,10 +41,10 @@ export function notificationsRouter({
   router.get(
     '/',
     validateQuery(listQuery),
-    (_request, response) => {
+    asyncHandler(async (_request, response) => {
       const { limit } = queryOf<z.infer<typeof listQuery>>(response);
-      response.json(notifications.history(limit));
-    },
+      response.json(await notifications.history(limit));
+    }),
   );
 
   router.post(

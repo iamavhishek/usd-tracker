@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import type { Express } from 'express';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 import { loadConfig } from '../src/config/env.js';
@@ -50,7 +51,7 @@ class FakeProvider implements RateProvider {
 
 const config = loadConfig({
   NODE_ENV: 'test',
-  DATABASE_PATH: ':memory:',
+  TURSO_DATABASE_URL: ':memory:',
   DATABASE_AUTO_MIGRATE: 'true',
   MIGRATIONS_DIR: `${process.cwd()}/drizzle`,
   API_KEY,
@@ -68,11 +69,11 @@ const config = loadConfig({
 const provider = new FakeProvider();
 const fcm = new FcmService(config);
 let database: DatabaseConnection;
-let app: ReturnType<typeof createApp>;
+let app: Express;
 
-beforeAll(() => {
-  database = createDatabase(config);
-  app = createApp({ config, database, provider, fcm });
+beforeAll(async () => {
+  database = await createDatabase(config);
+  app = await createApp({ config, database, provider, fcm });
 });
 
 afterAll(() => {
@@ -158,7 +159,7 @@ describe('USD Tracker API (e2e)', () => {
   });
 
   it('prunes rate history older than seven days', async () => {
-    database.db
+    await database.db
       .insert(rateSnapshots)
       .values({
         base: 'USD',

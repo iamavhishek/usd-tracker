@@ -15,11 +15,11 @@ export class AlertsService {
     private readonly config: AppConfig,
   ) {}
 
-  create(input: CreateAlertInput): AlertRule {
+  async create(input: CreateAlertInput): Promise<AlertRule> {
     const quote = this.assertTracked(input.quote);
     const now = new Date().toISOString();
 
-    const rule = this.repository.create({
+    const rule = await this.repository.create({
       name:
         input.name?.trim() ||
         this.defaultName(quote, input.condition, input.threshold),
@@ -39,18 +39,18 @@ export class AlertsService {
     return rule;
   }
 
-  findAll(): AlertRule[] {
+  async findAll(): Promise<AlertRule[]> {
     return this.repository.list();
   }
 
-  findOne(id: number): AlertRule {
-    const rule = this.repository.findById(id);
+  async findOne(id: number): Promise<AlertRule> {
+    const rule = await this.repository.findById(id);
     if (!rule) throw new HttpError(404, `Alert #${id} not found`);
     return rule;
   }
 
-  update(id: number, input: UpdateAlertInput): AlertRule {
-    const existing = this.findOne(id);
+  async update(id: number, input: UpdateAlertInput): Promise<AlertRule> {
+    const existing = await this.findOne(id);
     const now = new Date().toISOString();
     const patch: UpdateAlertPatch = { updatedAt: now };
 
@@ -69,23 +69,23 @@ export class AlertsService {
 
     if (triggerChanged) patch.lastTriggeredAt = null;
 
-    const updated = this.repository.update(id, patch);
+    const updated = await this.repository.update(id, patch);
     if (!updated) throw new HttpError(404, `Alert #${id} not found`);
     return updated;
   }
 
-  remove(id: number): { id: number; removed: true } {
-    this.findOne(id);
-    this.repository.remove(id);
+  async remove(id: number): Promise<{ id: number; removed: true }> {
+    await this.findOne(id);
+    await this.repository.remove(id);
     return { id, removed: true };
   }
 
-  enabledForQuote(quote: string): AlertRule[] {
+  async enabledForQuote(quote: string): Promise<AlertRule[]> {
     return this.repository.enabledForQuote(quote);
   }
 
-  markTriggered(id: number, at: string): void {
-    this.repository.markTriggered(id, at);
+  async markTriggered(id: number, at: string): Promise<void> {
+    await this.repository.markTriggered(id, at);
   }
 
   private assertTracked(rawQuote: string): string {

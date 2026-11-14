@@ -16,7 +16,8 @@ const envSchema = z.object({
   FRANKFURTER_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(10_000),
   FRANKFURTER_RETRIES: z.coerce.number().int().min(0).max(5).default(2),
 
-  DATABASE_PATH: z.string().default('./data/usd-tracker.db'),
+  TURSO_DATABASE_URL: z.string().default('file:./data/usd-tracker.db'),
+  TURSO_AUTH_TOKEN: z.string().default(''),
   DATABASE_AUTO_MIGRATE: z.string().default('true'),
   MIGRATIONS_DIR: z.string().default('./drizzle'),
   HISTORY_RETENTION_DAYS: z.coerce.number().int().min(1).default(7),
@@ -52,7 +53,8 @@ export interface AppConfig {
   frankfurterTimeoutMs: number;
   frankfurterRetries: number;
 
-  databasePath: string;
+  databaseUrl: string;
+  tursoAuthToken?: string;
   databaseAutoMigrate: boolean;
   migrationsDir: string;
   historyRetentionDays: number;
@@ -115,11 +117,6 @@ export function loadConfig(
     throw new Error(`Invalid ISO-4217 currency in TRACKED_QUOTES: ${invalidQuote}`);
   }
 
-  const databasePath =
-    env.DATABASE_PATH === ':memory:'
-      ? env.DATABASE_PATH
-      : resolve(process.cwd(), env.DATABASE_PATH);
-
   return {
     nodeEnv: env.NODE_ENV,
     isProduction: env.NODE_ENV === 'production',
@@ -138,7 +135,8 @@ export function loadConfig(
     frankfurterTimeoutMs: env.FRANKFURTER_TIMEOUT_MS,
     frankfurterRetries: env.FRANKFURTER_RETRIES,
 
-    databasePath,
+    databaseUrl: env.TURSO_DATABASE_URL,
+    tursoAuthToken: optional(env.TURSO_AUTH_TOKEN),
     databaseAutoMigrate: boolean(env.DATABASE_AUTO_MIGRATE),
     migrationsDir: resolve(process.cwd(), env.MIGRATIONS_DIR),
     historyRetentionDays: env.HISTORY_RETENTION_DAYS,

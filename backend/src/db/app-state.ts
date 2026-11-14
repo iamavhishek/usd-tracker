@@ -1,31 +1,31 @@
 import { eq } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { appState } from './schema.js';
 import type * as schema from './schema.js';
 
 export class AppStateRepository {
-  constructor(private readonly db: BunSQLiteDatabase<typeof schema>) {}
+  constructor(private readonly db: LibSQLDatabase<typeof schema>) {}
 
-  set<T>(key: string, value: T): void {
+  async set<T>(key: string, value: T): Promise<void> {
     const serialized = JSON.stringify(value);
     const now = new Date().toISOString();
 
-    this.db
+    await this.db
       .insert(appState)
       .values({ key, value: serialized, updatedAt: now })
       .onConflictDoUpdate({
         target: appState.key,
         set: { value: serialized, updatedAt: now },
-      })
-      .run();
+      });
   }
 
-  get<T>(key: string): T | null {
-    const row = this.db
+  async get<T>(key: string): Promise<T | null> {
+    const rows = await this.db
       .select()
       .from(appState)
       .where(eq(appState.key, key))
-      .get();
+      .limit(1);
+    const row = rows[0];
 
     if (!row) return null;
 

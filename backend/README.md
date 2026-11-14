@@ -1,7 +1,7 @@
 # USD Tracker API
 
 Express 5 + TypeScript API on Bun. It fetches **Frankfurter** rates on demand,
-stores changes in **SQLite via Drizzle ORM**, and sends **Firebase Cloud
+stores changes in **Turso/libSQL via Drizzle ORM**, and sends **Firebase Cloud
 Messaging** alerts to the Android app.
 
 There is **no in-process scheduler**. An external cron service calls a secured
@@ -12,14 +12,15 @@ lets you deploy the web process without a background loop.
 
 | Concern      | Choice                                              |
 | ------------ | --------------------------------------------------- |
-| Runtime      | Bun 1.4                                             |
+| Runtime      | Bun 1.4 locally; Node 20+ on Vercel                 |
 | HTTP         | Express 5, feature-first routers                    |
 | Validation   | Zod 4                                               |
-| Persistence  | SQLite (`bun:sqlite`) + Drizzle ORM 0.45            |
+| Persistence  | Turso Cloud / libSQL + Drizzle ORM 0.45             |
 | Migrations   | drizzle-kit generate → applied on boot              |
 | Push         | `firebase-admin` → FCM HTTP v1                      |
 | Scheduling   | external cron → `/api/v1/cron/rates` (no `cron` pkg)|
 | Tests        | Bun test + supertest                                |
+| Deploy       | Docker or Vercel (`api/index.ts` + Vercel Cron)      |
 
 ## Quick start
 
@@ -29,6 +30,7 @@ bun install
 cp .env.example .env
 
 # set API_KEY and CRON_SECRET in .env, and the Firebase base64 credential
+# local default DB is a libSQL file: file:./data/usd-tracker.db
 bun run dev                     # http://localhost:3000/api/v1
 
 # trigger a poll manually (this is what the external cron does)
@@ -162,13 +164,15 @@ See [`.env.example`](./.env.example). Important values:
 | ---------------------------- | ----------------------- | ---------------------------------- |
 | `BASE_CURRENCY`              | `USD`                   | ISO-4217 base                      |
 | `TRACKED_QUOTES`             | `NPR`                   | Comma-separated quotes             |
-| `DATABASE_PATH`              | `./data/usd-tracker.db` | `:memory:` for tests               |
+| `TURSO_DATABASE_URL`         | `file:./data/usd-tracker.db` | Turso URL or local libSQL file |
+| `TURSO_AUTH_TOKEN`           | empty                   | Turso token (not needed for file)  |
 | `API_KEY`                    | empty                   | Empty = admin routes public (dev)  |
 | `CRON_SECRET`                | empty                   | Required for `/cron/*`; 503 if empty|
 | `NOTIFY_EVERY_TICK`          | `false`                 | Push every poll                    |
 | `SIGNIFICANT_CHANGE_PERCENT` | `0.5`                   | `0` disables                       |
 | `ALERT_COOLDOWN_SECONDS`     | `21600`                 | Default for new rules              |
 | `FIREBASE_SERVICE_ACCOUNT_*` | empty                   | Base64/JSON/path                   |
+| `HISTORY_RETENTION_DAYS`     | `7`                     | Rate history window                |
 
 ## Firebase
 
@@ -216,24 +220,67 @@ docker compose up --build -d
 # external cron calls the published endpoints; the container does not schedule
 ```
 
-SQLite lives in the `usd-tracker-data` volume. The image runs
-`bun dist/server.js`.
+With the default `file:` URL, libSQL lives in the `usd-tracker-data` volume. For
+Turso Cloud, set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`; no volume is
+needed. The image runs `bun dist/server.js`.
 
-## Vercel / serverless
+## Turso Cloud
 
-The API endpoints are serverless-friendly now, but **SQLite is not**: Vercel's
-filesystem is ephemeral (only `/tmp`), so data would disappear between
-invocations. For Vercel, migrate the database to Postgres (Neon) and then use
-Vercel Cron against `/api/v1/cron/rates` (GET + Bearer secret). Until then, deploy
-the Docker image to a host with a persistent volume (Railway, Render, Fly.io,
-VPS).
+Create the database and token:
+
+```bash
+turso db create usd-tracker
+turso db show usd-tracker --url          # libsql://...
+turso db tokens create usd-tracker       # token
+```
+
+Set:
+
+```env
+TURSO_DATABASE_URL=libsql://<db>-<org>.turso.io
+TURSO_AUTH_TOKEN=<token>
+```
+
+Apply migrations once (or let the app auto-migrate on boot):
+
+```bash
+TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... bun run db:migrate
+```
+
+The local `file:./data/usd-tracker.db` default needs no token and is ignored by
+git.
+
+## Vercel
+
+Vercel is supported with Turso Cloud (not the local `file:` URL):
+
+1. In Vercel, set **Root Directory = `backend`** and **Framework Preset = Other**.
+   Do not select the Bun preset: it expects a `Bun.serve()` server and ignores
+   `api/index.ts`, producing `Invalid export found ... src/app.js`.
+   `src/app.ts` now also has a lazy default Express export, so zero-config
+   Express detection works as a fallback. `vercel.json` sets `"framework": null`.
+2. Add environment variables: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`,
+   `API_KEY`, `CRON_SECRET` and `FIREBASE_SERVICE_ACCOUNT_BASE64`.
+3. Apply migrations against Turso (`bun run db:migrate` with the Turso env).
+4. Deploy. `vercel.json` routes all requests to `api/index.ts` and schedules:
+   - `/api/v1/cron/rates` every minute
+   - `/api/v1/cron/maintenance` at 03:15
+5. Vercel sends `Authorization: Bearer $CRON_SECRET` to cron routes, so
+   `CRON_SECRET` must be set in Vercel.
+
+`vercel.json` sets `"framework": null` to keep Vercel on the Node.js function
+runtime. `includeFiles: ["drizzle/**"]` bundles migrations if you need
+auto-migrate at runtime; for lower cold-start cost set
+`DATABASE_AUTO_MIGRATE=false` after the initial migration. A once-per-minute Vercel Cron requires a plan that supports
+that frequency. The handler uses the Node runtime; Turso is accessed over HTTPS,
+so no persistent filesystem is required.
 
 ## Tests
 
 ```bash
-bun test           # alert rules, message builder, Frankfurter client
-bun run test:e2e   # HTTP: health, auth, poll, device, alert, push skip, maintenance
+bun test           # 11 unit: alert rules, message builder, Frankfurter client
+bun run test:e2e   # 7 HTTP: health, auth, poll, device, alert, push skip, 7-day retention
 ```
 
-The e2e suite uses an in-memory database and a fake provider; FCM is intentionally
+The e2e suite uses an in-memory libSQL database and a fake provider; FCM is intentionally
 unconfigured there, so pushes are logged as skipped.

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": [
+        "drizzle/**"
+      ]
+    }
+  },
+  "installCommand": "bun install",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.ts"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/v1/cron/rates",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/v1/cron/maintenance",
+      "schedule": "15 3 * * *"
+    }
+  ]
+}

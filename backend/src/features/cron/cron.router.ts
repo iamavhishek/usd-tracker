@@ -31,9 +31,9 @@ export function cronRouter({
     response.status(200).json(summary);
   });
 
-  const runCleanup = (_request: Request, response: Response): void => {
-    response.status(200).json(maintenance.cleanup());
-  };
+  const runCleanup = asyncHandler(async (_request, response) => {
+    response.status(200).json(await maintenance.cleanup());
+  });
 
   router.get('/rates', runPoll);
   router.post('/rates', runPoll);

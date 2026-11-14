@@ -178,7 +178,7 @@ rebuild-isolation test.
   plugin still compiles against API 35.
 - Rates are official daily reference values from Frankfurter; the backend checks
   every minute but the value changes roughly once per business day.
-- The SQLite/Hive cache is network-first: on a failed fetch the last snapshot is
+- The Hive cache is network-first: on a failed fetch the last snapshot is
   shown with a “Cached” pill.
 - The app expects the backend's `GET /rates` and `/rates/:quote/history`
   response shapes; no other transport.

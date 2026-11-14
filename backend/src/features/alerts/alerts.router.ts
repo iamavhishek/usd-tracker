@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { AppConfig } from '../../config/env.js';
+import { asyncHandler } from '../../shared/errors.js';
 import { idParam, requireApiKey, validateBody } from '../../shared/http.js';
 import {
   createAlertSchema,
@@ -19,30 +20,39 @@ export function alertsRouter({ config, alerts }: AlertsRouterDeps): Router {
   router.post(
     '/',
     validateBody(createAlertSchema),
-    (request, response) => {
-      response.status(201).json(alerts.create(request.body));
-    },
+    asyncHandler(async (request, response) => {
+      response.status(201).json(await alerts.create(request.body));
+    }),
   );
 
-  router.get('/', (_request, response) => {
-    response.json(alerts.findAll());
-  });
+  router.get(
+    '/',
+    asyncHandler(async (_request, response) => {
+      response.json(await alerts.findAll());
+    }),
+  );
 
-  router.get('/:id', (request, response) => {
-    response.json(alerts.findOne(idParam(request)));
-  });
+  router.get(
+    '/:id',
+    asyncHandler(async (request, response) => {
+      response.json(await alerts.findOne(idParam(request)));
+    }),
+  );
 
   router.patch(
     '/:id',
     validateBody(updateAlertSchema),
-    (request, response) => {
-      response.json(alerts.update(idParam(request), request.body));
-    },
+    asyncHandler(async (request, response) => {
+      response.json(await alerts.update(idParam(request), request.body));
+    }),
   );
 
-  router.delete('/:id', (request, response) => {
-    response.json(alerts.remove(idParam(request)));
-  });
+  router.delete(
+    '/:id',
+    asyncHandler(async (request, response) => {
+      response.json(await alerts.remove(idParam(request)));
+    }),
+  );
 
   return router;
 }

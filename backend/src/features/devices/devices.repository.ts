@@ -1,5 +1,5 @@
 import { and, count, desc, eq, inArray } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { devices, type Device } from '../../db/schema.js';
 import type * as schema from '../../db/schema.js';
 
@@ -13,10 +13,10 @@ export interface UpsertDeviceInput {
 const DELETE_CHUNK_SIZE = 400;
 
 export class DevicesRepository {
-  constructor(private readonly db: BunSQLiteDatabase<typeof schema>) {}
+  constructor(private readonly db: LibSQLDatabase<typeof schema>) {}
 
-  upsert(input: UpsertDeviceInput): Device {
-    const device = this.db
+  async upsert(input: UpsertDeviceInput): Promise<Device> {
+    const rows = await this.db
       .insert(devices)
       .values({
         token: input.token,
@@ -37,62 +37,55 @@ export class DevicesRepository {
           lastSeenAt: input.now,
         },
       })
-      .returning()
-      .get();
+      .returning();
 
+    const device = rows[0];
     if (!device) throw new Error('Failed to persist device registration');
     return device;
   }
 
-  list(): Device[] {
-    return this.db
-      .select()
-      .from(devices)
-      .orderBy(desc(devices.createdAt))
-      .all();
+  async list(): Promise<Device[]> {
+    return this.db.select().from(devices).orderBy(desc(devices.createdAt));
   }
 
-  activeTokensForQuote(quote: string): string[] {
-    return this.db
+  async activeTokensForQuote(quote: string): Promise<string[]> {
+    const rows = await this.db
       .select({ token: devices.token })
       .from(devices)
-      .where(and(eq(devices.quote, quote), eq(devices.enabled, true)))
-      .all()
-      .map((row) => row.token);
+      .where(and(eq(devices.quote, quote), eq(devices.enabled, true)));
+    return rows.map((row) => row.token);
   }
 
-  countActive(): number {
-    const row = this.db
+  async countActive(): Promise<number> {
+    const rows = await this.db
       .select({ value: count() })
       .from(devices)
       .where(eq(devices.enabled, true))
-      .get();
-    return Number(row?.value ?? 0);
+      .limit(1);
+    return Number(rows[0]?.value ?? 0);
   }
 
-  remove(token: string): boolean {
-    return (
-      this.db
-        .delete(devices)
-        .where(eq(devices.token, token))
-        .returning({ id: devices.id })
-        .all().length > 0
-    );
+  async remove(token: string): Promise<boolean> {
+    const rows = await this.db
+      .delete(devices)
+      .where(eq(devices.token, token))
+      .returning({ id: devices.id });
+    return rows.length > 0;
   }
 
-  removeMany(tokens: string[]): number {
+  async removeMany(tokens: string[]): Promise<number> {
     const unique = [...new Set(tokens)].filter(Boolean);
     if (unique.length === 0) return 0;
 
     let removed = 0;
-    this.db.transaction((tx) => {
+    await this.db.transaction(async (tx) => {
       for (let index = 0; index < unique.length; index += DELETE_CHUNK_SIZE) {
         const chunk = unique.slice(index, index + DELETE_CHUNK_SIZE);
-        removed += tx
+        const rows = await tx
           .delete(devices)
           .where(inArray(devices.token, chunk))
-          .returning({ id: devices.id })
-          .all().length;
+          .returning({ id: devices.id });
+        removed += rows.length;
       }
     });
     return removed;

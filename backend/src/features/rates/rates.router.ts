@@ -33,21 +33,27 @@ export function ratesRouter({
   const router = Router();
   const adminOnly = requireApiKey(config);
 
-  router.get('/', (_request, response) => {
-    response.json(rates.getOverview());
-  });
+  router.get(
+    '/',
+    asyncHandler(async (_request, response) => {
+      response.json(await rates.getOverview());
+    }),
+  );
 
-  router.get('/:quote', (request, response) => {
-    response.json(rates.getLatest(quoteParam(request)));
-  });
+  router.get(
+    '/:quote',
+    asyncHandler(async (request, response) => {
+      response.json(await rates.getLatest(quoteParam(request)));
+    }),
+  );
 
   router.get(
     '/:quote/history',
     validateQuery(historyQuery),
-    (request, response) => {
+    asyncHandler(async (request, response) => {
       const { limit } = queryOf<z.infer<typeof historyQuery>>(response);
-      response.json(rates.getHistory(quoteParam(request), limit));
-    },
+      response.json(await rates.getHistory(quoteParam(request), limit));
+    }),
   );
 
   router.post(

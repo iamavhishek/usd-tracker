@@ -61,18 +61,18 @@ export class RatesService {
     private readonly state: AppStateRepository,
   ) {}
 
-  ingest(rates: FetchedRate[]): IngestedRate[] {
+  async ingest(rates: FetchedRate[]): Promise<IngestedRate[]> {
     const ingested: IngestedRate[] = [];
 
     for (const rate of rates) {
-      const previous = this.repository.latest(rate.quote);
+      const previous = await this.repository.latest(rate.quote);
       const changed =
         !previous ||
         previous.rate !== rate.rate ||
         previous.rateDate !== rate.rateDate;
 
       if (changed) {
-        this.repository.insert({
+        await this.repository.insert({
           base: rate.base,
           quote: rate.quote,
           rate: rate.rate,
@@ -93,22 +93,27 @@ export class RatesService {
     return ingested;
   }
 
-  getOverview(): RateOverviewResponse {
+  async getOverview(): Promise<RateOverviewResponse> {
+    const rates: RateResponse[] = [];
+    for (const quote of this.config.quotes) {
+      const current = await this.repository.latest(quote);
+      if (!current) {
+        rates.push(this.emptyRate(quote));
+        continue;
+      }
+      const previous = await this.repository.latestBefore(quote, current);
+      rates.push(this.toDto(current, previous));
+    }
     return {
       base: this.config.baseCurrency,
-      rates: this.config.quotes.map((quote) => {
-        const current = this.repository.latest(quote);
-        if (!current) return this.emptyRate(quote);
-        const previous = this.repository.latestBefore(quote, current);
-        return this.toDto(current, previous);
-      }),
-      lastPoll: this.getLastPoll(),
+      rates,
+      lastPoll: await this.getLastPoll(),
     };
   }
 
-  getLatest(quote: string): RateResponse {
+  async getLatest(quote: string): Promise<RateResponse> {
     this.assertTracked(quote);
-    const current = this.repository.latest(quote);
+    const current = await this.repository.latest(quote);
 
     if (!current) {
       throw new HttpError(
@@ -117,15 +122,15 @@ export class RatesService {
       );
     }
 
-    const previous = this.repository.latestBefore(quote, current);
+    const previous = await this.repository.latestBefore(quote, current);
     return this.toDto(current, previous);
   }
 
-  getHistory(quote: string, limit = 100): RateHistoryResponse {
+  async getHistory(quote: string, limit = 100): Promise<RateHistoryResponse> {
     this.assertTracked(quote);
 
-    const points = this.repository
-      .history(quote, limit)
+    const snapshots = await this.repository.history(quote, limit);
+    const points = snapshots
       .reverse()
       .map((snapshot) => ({
         rate: snapshot.rate,
@@ -155,7 +160,7 @@ export class RatesService {
       toDate,
     );
 
-    const inserted = this.repository.insertMany(
+    const inserted = await this.repository.insertMany(
       rates.map((rate) => ({
         base: rate.base,
         quote: rate.quote,
@@ -178,7 +183,7 @@ export class RatesService {
     };
   }
 
-  getLastPoll(): PollSummary | null {
+  async getLastPoll(): Promise<PollSummary | null> {
     return this.state.get<PollSummary>('last_poll');
   }
 

@@ -1,7 +1,12 @@
 import cors from 'cors';
-import express, { type Express } from 'express';
-import type { AppConfig } from './config/env.js';
-import type { DatabaseConnection } from './db/database.js';
+import express, {
+  type Express,
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
+import { loadConfig, type AppConfig } from './config/env.js';
+import { createDatabase, type DatabaseConnection } from './db/database.js';
 import { AppStateRepository } from './db/app-state.js';
 import { AlertsRepository } from './features/alerts/alerts.repository.js';
 import { AlertsService } from './features/alerts/alerts.service.js';
@@ -14,6 +19,7 @@ import { HealthService } from './features/health/health.service.js';
 import { healthRouter } from './features/health/health.router.js';
 import { MaintenanceService } from './features/maintenance/maintenance.service.js';
 import { FcmService } from './features/notifications/fcm.service.js';
+import { FrankfurterProvider } from './features/rates/frankfurter.js';
 import { NotificationsRepository } from './features/notifications/notifications.repository.js';
 import { NotificationsService } from './features/notifications/notifications.service.js';
 import { notificationsRouter } from './features/notifications/notifications.router.js';
@@ -31,12 +37,12 @@ export interface AppDependencies {
   fcm: FcmService;
 }
 
-export function createApp({
+export async function createApp({
   config,
   database,
   provider,
   fcm,
-}: AppDependencies): Express {
+}: AppDependencies): Promise<Express> {
   const state = new AppStateRepository(database.db);
 
   const ratesRepository = new RatesRepository(database.db);
@@ -67,7 +73,7 @@ export function createApp({
     notificationsRepository,
   );
   // Enforce retention on boot as well as on every poll.
-  maintenance.cleanup();
+  await maintenance.cleanup();
 
   const polling = new PollingService(
     provider,
@@ -117,3 +123,33 @@ export function createApp({
 
   return app;
 }
+
+/**
+ * Vercel / zero-config Express entrypoint.
+ *
+ * Vercel looks for the file that exports an Express app. This default export
+ * lazily builds the real app on the first request, so module evaluation does
+ * not need top-level await or a listening socket.
+ */
+let bootstrapPromise: Promise<Express> | null = null;
+
+async function buildDefaultApp(): Promise<Express> {
+  const config = loadConfig();
+  const database = await createDatabase(config);
+  const fcm = new FcmService(config);
+  fcm.initialize();
+  const provider = new FrankfurterProvider(config);
+  return createApp({ config, database, provider, fcm });
+}
+
+const serverlessApp = express();
+serverlessApp.disable('x-powered-by');
+serverlessApp.use(
+  (request: Request, response: Response, next: NextFunction) => {
+    void (bootstrapPromise ??= buildDefaultApp())
+      .then((app) => app(request, response, next))
+      .catch(next);
+  },
+);
+
+export default serverlessApp;

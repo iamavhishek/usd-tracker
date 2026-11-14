@@ -1,5 +1,5 @@
 import { desc, lt } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import {
   notifications,
   type NewNotification,
@@ -8,26 +8,31 @@ import {
 import type * as schema from '../../db/schema.js';
 
 export class NotificationsRepository {
-  constructor(private readonly db: BunSQLiteDatabase<typeof schema>) {}
+  constructor(private readonly db: LibSQLDatabase<typeof schema>) {}
 
-  create(values: NewNotification): Notification {
-    return this.db.insert(notifications).values(values).returning().get();
+  async create(values: NewNotification): Promise<Notification> {
+    const rows = await this.db
+      .insert(notifications)
+      .values(values)
+      .returning();
+    const notification = rows[0];
+    if (!notification) throw new Error('Failed to log notification');
+    return notification;
   }
 
-  recent(limit: number): Notification[] {
+  async recent(limit: number): Promise<Notification[]> {
     return this.db
       .select()
       .from(notifications)
       .orderBy(desc(notifications.id))
-      .limit(limit)
-      .all();
+      .limit(limit);
   }
 
-  deleteOlderThan(cutoffIso: string): number {
-    return this.db
+  async deleteOlderThan(cutoffIso: string): Promise<number> {
+    const rows = await this.db
       .delete(notifications)
       .where(lt(notifications.createdAt, cutoffIso))
-      .returning({ id: notifications.id })
-      .all().length;
+      .returning({ id: notifications.id });
+    return rows.length;
   }
 }

@@ -18,9 +18,9 @@ export class HealthService {
     private readonly provider: RateProvider,
   ) {}
 
-  check(): Record<string, unknown> {
-    const lastPoll = this.state.get<PollSummary>('last_poll');
-    const databaseOk = this.database.ping();
+  async check(): Promise<Record<string, unknown>> {
+    const lastPoll = await this.state.get<PollSummary>('last_poll');
+    const databaseOk = await this.database.ping();
     const lastPollAgeMs = lastPoll
       ? Date.now() - Date.parse(lastPoll.finishedAt)
       : null;
@@ -48,7 +48,7 @@ export class HealthService {
         lastPoll,
       },
       fcm: this.fcm.status,
-      devices: { active: this.devices.count() },
+      devices: { active: await this.devices.count() },
     };
   }
 }

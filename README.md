@@ -5,7 +5,7 @@ Drizzle** backend and a **Flutter Android** client.
 
 - **Backend** (`backend/`) — Express 5 on Bun. Fetches
   [Frankfurter](https://frankfurter.dev) rates on demand, stores changes in
-  SQLite via Drizzle ORM, evaluates threshold alerts and sends Firebase Cloud
+  Turso/libSQL via Drizzle ORM, evaluates threshold alerts and sends Firebase Cloud
   Messaging pushes. **No in-process cron**: an external scheduler calls a secured
   endpoint every minute.
 - **App** (`app/`) — Flutter 3.50 client on `material_ui`, with Bloc + Dio +
@@ -76,15 +76,15 @@ External cron ──► POST /api/v1/cron/rates
                        ▼
               Fetch Frankfurter v2
                        │
-              store changed rate (Drizzle/SQLite)
+              store changed rate (Drizzle + Turso/libSQL)
                        │
               evaluate threshold rules
                        │
               FCM multicast to registered devices
 ```
 
-The web process can sleep between requests; state lives in SQLite. For a
-serverless host, replace SQLite with Postgres (Neon) first.
+The web process can sleep between requests; state lives in Turso/libSQL. Locally
+the default is a libSQL file; Vercel uses a Turso Cloud database over HTTPS.
 
 ## API
 
@@ -135,7 +135,7 @@ Full details: [`docs/flutter-integration.md`](docs/flutter-integration.md).
 ## Tests
 
 ```bash
-# Backend: 11 unit + 6 e2e
+# Backend: 11 unit + 7 e2e
 cd backend
 bun test
 bun run test:e2e
@@ -157,6 +157,8 @@ backend/
     db/{schema,database,app-state}.ts
     features/{rates,alerts,devices,notifications,health,cron,maintenance}/
     shared/{errors,http,logger}.ts
+  api/index.ts             Vercel function entrypoint
+  vercel.json              rewrites + cron schedule
   drizzle/                 CLI-generated migrations
   test/                    unit + e2e
 app/
@@ -169,8 +171,9 @@ docs/
 
 ## Requirements
 
-- Bun **1.3+** (built with 1.4)
+- Bun **1.3+** locally; Node 20+ on Vercel
 - Flutter **3.50** / Dart 3.14 and Android SDK with API 37
+- Turso Cloud database for Vercel (local `file:` DB otherwise)
 - Firebase project for real push (optional for development)
 
 ## Notes
@@ -179,8 +182,9 @@ docs/
   `/api/v1/cron/rates` every minute.
 - Frankfurter publishes official **daily** rates; minute polling catches new
   publications quickly but is not intraday tick data.
-- SQLite + a single Express process assume one replica. For Vercel, migrate to
-  Postgres first; SQLite's filesystem is ephemeral there.
+- Turso is remote, so Vercel has no filesystem dependency. The poll's overlap
+  guard is still per instance; use a DB lock if you expect concurrent invocations.
+- Vercel Cron for a once-per-minute schedule requires a plan that allows it.
 - Alerts are global; per-device criteria (`brother wants < 140 NPR`) needs the
   alert-ownership schema change described in the backend README.
 - The app is built on Flutter 3.50's `material_ui` package. `reactive_forms`

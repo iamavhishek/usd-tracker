@@ -6,13 +6,13 @@ import { FrankfurterProvider } from './features/rates/frankfurter.js';
 import { logger } from './shared/logger.js';
 
 const config = loadConfig();
-const database = createDatabase(config);
+const database = await createDatabase(config);
 
 const fcm = new FcmService(config);
 fcm.initialize();
 
 const provider = new FrankfurterProvider(config);
-const app = createApp({ config, database, provider, fcm });
+const app = await createApp({ config, database, provider, fcm });
 
 const server = app.listen(config.port, '0.0.0.0', () => {
   logger.info(`API      → http://localhost:${config.port}/api/v1`);

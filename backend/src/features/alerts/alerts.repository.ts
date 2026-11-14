@@ -1,5 +1,5 @@
 import { and, desc, eq } from 'drizzle-orm';
-import type { BunSQLiteDatabase } from 'drizzle-orm/bun-sqlite';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import { alertRules, type AlertRule } from '../../db/schema.js';
 import type * as schema from '../../db/schema.js';
 
@@ -29,35 +29,31 @@ export type UpdateAlertPatch = Partial<
 >;
 
 export class AlertsRepository {
-  constructor(private readonly db: BunSQLiteDatabase<typeof schema>) {}
+  constructor(private readonly db: LibSQLDatabase<typeof schema>) {}
 
-  list(): AlertRule[] {
-    return this.db
-      .select()
-      .from(alertRules)
-      .orderBy(desc(alertRules.id))
-      .all();
+  async list(): Promise<AlertRule[]> {
+    return this.db.select().from(alertRules).orderBy(desc(alertRules.id));
   }
 
-  findById(id: number): AlertRule | undefined {
-    return this.db
+  async findById(id: number): Promise<AlertRule | undefined> {
+    const rows = await this.db
       .select()
       .from(alertRules)
       .where(eq(alertRules.id, id))
-      .get();
+      .limit(1);
+    return rows[0];
   }
 
-  enabledForQuote(quote: string): AlertRule[] {
+  async enabledForQuote(quote: string): Promise<AlertRule[]> {
     return this.db
       .select()
       .from(alertRules)
       .where(and(eq(alertRules.quote, quote), eq(alertRules.enabled, true)))
-      .orderBy(desc(alertRules.id))
-      .all();
+      .orderBy(desc(alertRules.id));
   }
 
-  create(values: CreateAlertValues): AlertRule {
-    return this.db
+  async create(values: CreateAlertValues): Promise<AlertRule> {
+    const rows = await this.db
       .insert(alertRules)
       .values({
         name: values.name,
@@ -71,34 +67,37 @@ export class AlertsRepository {
         createdAt: values.now,
         updatedAt: values.now,
       })
-      .returning()
-      .get();
+      .returning();
+
+    const rule = rows[0];
+    if (!rule) throw new Error('Failed to create alert');
+    return rule;
   }
 
-  update(id: number, patch: UpdateAlertPatch): AlertRule | undefined {
-    return this.db
+  async update(
+    id: number,
+    patch: UpdateAlertPatch,
+  ): Promise<AlertRule | undefined> {
+    const rows = await this.db
       .update(alertRules)
       .set(patch)
       .where(eq(alertRules.id, id))
-      .returning()
-      .get();
+      .returning();
+    return rows[0];
   }
 
-  remove(id: number): boolean {
-    return (
-      this.db
-        .delete(alertRules)
-        .where(eq(alertRules.id, id))
-        .returning({ id: alertRules.id })
-        .all().length > 0
-    );
+  async remove(id: number): Promise<boolean> {
+    const rows = await this.db
+      .delete(alertRules)
+      .where(eq(alertRules.id, id))
+      .returning({ id: alertRules.id });
+    return rows.length > 0;
   }
 
-  markTriggered(id: number, at: string): void {
-    this.db
+  async markTriggered(id: number, at: string): Promise<void> {
+    await this.db
       .update(alertRules)
       .set({ lastTriggeredAt: at, updatedAt: at })
-      .where(eq(alertRules.id, id))
-      .run();
+      .where(eq(alertRules.id, id));
   }
 }
