@@ -262,25 +262,25 @@ git.
 
 Vercel is supported with Turso Cloud (not the local `file:` URL):
 
-1. In Vercel, set **Root Directory = `backend`** and **Framework Preset = Other**.
-   Do not select the Bun preset: it expects a `Bun.serve()` server and ignores
-   `api/index.ts`, producing `Invalid export found ... src/app.js`.
-   `src/app.ts` now also has a lazy default Express export, so zero-config
-   Express detection works as a fallback. `vercel.json` sets `"framework": null`.
+1. In Vercel, set **Root Directory = `backend`** and leave **Framework Preset =
+   Express** (the detected default). Do **not** override the framework to
+   "Other"/null: that makes Vercel expect a static `public/` output and can ignore
+   the Express handler.
 2. Add environment variables: `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`,
    `API_KEY`, `CRON_SECRET` and `FIREBASE_SERVICE_ACCOUNT_BASE64`.
 3. Apply migrations against Turso (`bun run db:migrate` with the Turso env).
-4. Deploy. `vercel.json` routes all requests to `api/index.ts`; it intentionally
-   contains **no `crons`** because Vercel Hobby only allows daily schedules.
+4. Deploy. The Express preset bundles `src/app.ts` (default lazy Express export)
+   into one Vercel Function and routes all paths to it. No `public/` output or
+   `rewrites` are required. `vercel.json` intentionally contains **no `crons`**
+   because Vercel Hobby only allows daily schedules.
 5. Create two cron-job.org jobs pointing at `/api/v1/cron/rates` (every minute)
    and `/api/v1/cron/maintenance` (daily), both with `X-Cron-Secret`.
 
-`vercel.json` sets `"framework": null` to keep Vercel on the Node.js function
-runtime. `includeFiles: "drizzle/**"` bundles migrations if you need
-auto-migrate at runtime; for lower cold-start cost set
-`DATABASE_AUTO_MIGRATE=false` after the initial migration. The handler uses the
-Node runtime; Turso is accessed over HTTPS, so no persistent filesystem is
-required. Scheduling is handled by cron-job.org, not Vercel Cron.
+Vercel's Express preset handles the function entrypoint; `src/app.ts` exports a
+lazy default Express app. Run migrations against Turso before the first deploy
+and set `DATABASE_AUTO_MIGRATE=false` on Vercel so cold starts do not depend on
+the `drizzle/` directory being bundled. Turso is remote, so no persistent
+filesystem is required. Scheduling is handled by cron-job.org, not Vercel Cron.
 
 ## Tests
 

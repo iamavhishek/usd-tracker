@@ -1,16 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "functions": {
-    "api/index.ts": {
-      "includeFiles": "drizzle/**"
-    }
-  },
-  "installCommand": "bun install",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/api/index.ts"
-    }
-  ]
+  "installCommand": "bun install"
 }
