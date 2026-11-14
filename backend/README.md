@@ -20,7 +20,7 @@ lets you deploy the web process without a background loop.
 | Push         | `firebase-admin` → FCM HTTP v1                      |
 | Scheduling   | external cron → `/api/v1/cron/rates` (no `cron` pkg)|
 | Tests        | Bun test + supertest                                |
-| Deploy       | Docker or Vercel (`api/index.ts` + cron-job.org)     |
+| Deploy       | Docker or Vercel (Express preset + cron-job.org)    |
 
 ## Quick start
 
@@ -270,9 +270,10 @@ Vercel is supported with Turso Cloud (not the local `file:` URL):
    `API_KEY`, `CRON_SECRET` and `FIREBASE_SERVICE_ACCOUNT_BASE64`.
 3. Apply migrations against Turso (`bun run db:migrate` with the Turso env).
 4. Deploy. The Express preset bundles `src/app.ts` (default lazy Express export)
-   into one Vercel Function and routes all paths to it. No `public/` output or
-   `rewrites` are required. `vercel.json` intentionally contains **no `crons`**
-   because Vercel Hobby only allows daily schedules.
+   into one Vercel Function and routes all paths to it. There is **no `api/`
+   directory** — Vercel reserves `/api/*` when one exists, which would bypass
+   Express routing. `vercel.json` intentionally contains **no `crons`** because
+   Vercel Hobby only allows daily schedules.
 5. Create two cron-job.org jobs pointing at `/api/v1/cron/rates` (every minute)
    and `/api/v1/cron/maintenance` (daily), both with `X-Cron-Secret`.
 

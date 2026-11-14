@@ -163,7 +163,6 @@ backend/
     db/{schema,database,app-state}.ts
     features/{rates,alerts,devices,notifications,health,cron,maintenance}/
     shared/{errors,http,logger}.ts
-  api/index.ts             Vercel function entrypoint
   vercel.json              rewrites + cron schedule
   drizzle/                 CLI-generated migrations
   test/                    unit + e2e

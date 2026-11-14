@@ -137,7 +137,10 @@ export function loadConfig(
 
     databaseUrl: env.TURSO_DATABASE_URL,
     tursoAuthToken: optional(env.TURSO_AUTH_TOKEN),
-    databaseAutoMigrate: boolean(env.DATABASE_AUTO_MIGRATE),
+    // Serverless cold starts must not depend on a bundled drizzle/ folder.
+    // Run `bun run db:migrate` against Turso as part of deployment.
+    databaseAutoMigrate:
+      boolean(env.DATABASE_AUTO_MIGRATE) && process.env.VERCEL !== '1',
     migrationsDir: resolve(process.cwd(), env.MIGRATIONS_DIR),
     historyRetentionDays: env.HISTORY_RETENTION_DAYS,
     notificationRetentionDays: env.NOTIFICATION_RETENTION_DAYS,
